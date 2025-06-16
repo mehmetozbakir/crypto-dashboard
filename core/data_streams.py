@@ -145,8 +145,10 @@ def restart_stream(exchange, symbol):
     _backfill_higher_tfs()
 
     # yeni WS görevi
-    stream = _binance_stream if exchange == "Binance" else _bybit_stream
-    _WS_TASKS.append(asyncio.create_task(stream(symbol)))
+    stream_fn = _STREAMS.get(exchange)
+    if stream_fn is None:
+        raise ValueError(f"No WS stream found for exchange: {exchange}")
+    _WS_TASKS.append(asyncio.create_task(stream_fn(symbol)))
 
 def df_candles(tf="1m") -> pd.DataFrame:
     raw = pd.DataFrame(list(CANDLES[tf]),
