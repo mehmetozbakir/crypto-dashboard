@@ -147,11 +147,16 @@ def fetch_symbols(exchange: str):
                     if i.get("status") == "Trading"]
 
         elif exchange == "OKX":
-            r = requests.get("https://www.okx.com/api/v5/public/instruments",
-                             params={"instType": "SWAP"}, timeout=5)
-            r.raise_for_status()
-            return [i["instId"] for i in r.json()["data"]
-                    if i["settleCcy"] == "USDT"]
+              # OKX SWAP enstrümanları döner, zaten hepsi USDT-margined
+             r = requests.get(
+                 "https://www.okx.com/api/v5/public/instruments",
+                 params={"instType": "SWAP"},
+                 timeout=5
+             )
+             r.raise_for_status()
+             data = r.json().get("data", [])
+                 # instId’leri al
+             return [item["instId"] for item in data]
 
         elif exchange == "Bitget":
             r = requests.get("https://api.bitget.com/api/v2/mix/market/contracts",
