@@ -37,42 +37,49 @@ def _backfill_higher_tfs():
 
 # ........................ REST geçmiş (1000 × 1 dak.)
 def _fetch_history_1m(exchange, symbol):
-    if exchange == "OKX":
-        url    = "https://www.okx.com/api/v5/market/history-candles"
-        params = {"instId": symbol, "bar": "1m", "limit": 1440}  # son 24 saati çekecek
-        r      = requests.get(url, params=params, timeout=8)
-        r.raise_for_status()
-        data = r.json().get("data", [])
-
-        # CANDLES["1m"] verisini tazeleyelim
-        CANDLES["1m"] = [
-            (
-                int(item[0]) // 1000,    # timestamp (saniye)
-                float(item[1]),         # open
-                float(item[2]),         # high
-                float(item[3]),         # low
-                float(item[4]),         # close
-            )
-            for item in reversed(data)
-        ]
-        return
-
     if exchange == "Binance":
         url = "https://fapi.binance.com/fapi/v1/klines"
         r = requests.get(url, params={"symbol":symbol, "interval":"1m", "limit":1440}, timeout=8)
         r.raise_for_status()
         rows = [(k[0]//1000, *map(float, k[1:6])) for k in r.json()]
-    else:                                            # Bybit
+
+    elif exchange == "Bybit":
         url = "https://api.bybit.com/v5/market/kline"
         r = requests.get(url, params={
-            "category":"linear", "symbol":symbol,
-            "interval":"1", "limit":1440}, timeout=8)
+            "category":"linear",
+            "symbol":symbol,
+            "interval":"1",
+            "limit":1440
+        }, timeout=8)
         r.raise_for_status()
-        rows = [(int(k[0])//1000, float(k[1]), float(k[2]),
-                 float(k[3]), float(k[4]), float(k[5]))
-                for k in reversed(r.json()["result"]["list"])]
-    CANDLES["1m"].extend(rows)
+        rows = [
+            (int(k[0])//1000,
+             float(k[1]), float(k[2]), float(k[3]),
+             float(k[4]), float(k[5]))
+            for k in reversed(r.json()["result"]["list"])
+        ]
 
+    elif exchange == "OKX":
+        url = "https://www.okx.com/api/v5/market/history-candles"
+        r = requests.get(url, params={
+            "instType":"UMCBL",
+            "instId":symbol,
+            "bar":"1m",
+            "limit":1440
+        }, timeout=8)
+        r.raise_for_status()
+        data = r.json().get("data", [])
+        rows = [
+            (int(k[0])//1000,
+             float(k[1]), float(k[2]), float(k[3]),
+             float(k[4]), float(k[5]))
+            for k in data
+        ]
+
+    else:
+        raise ValueError(f"Unsupported exchange for history fetch: {exchange}")
+
+    CANDLES["1m"].extend(rows)
 # ........................ WebSocket toplama
 async def _binance_stream(sym):
     uri = f"wss://stream.binance.com/stream?streams={sym.lower()}@trade"
