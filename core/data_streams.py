@@ -39,14 +39,14 @@ def _backfill_higher_tfs():
 def _fetch_history_1m(exchange, symbol):
     if exchange == "Binance":
         url = "https://fapi.binance.com/fapi/v1/klines"
-        r = requests.get(url, params={"symbol":symbol, "interval":"1m", "limit":1000}, timeout=8)
+        r = requests.get(url, params={"symbol":symbol, "interval":"1m", "limit":1440}, timeout=8)
         r.raise_for_status()
         rows = [(k[0]//1000, *map(float, k[1:6])) for k in r.json()]
     else:                                            # Bybit
         url = "https://api.bybit.com/v5/market/kline"
         r = requests.get(url, params={
             "category":"linear", "symbol":symbol,
-            "interval":"1", "limit":1000}, timeout=8)
+            "interval":"1", "limit":1440}, timeout=8)
         r.raise_for_status()
         rows = [(int(k[0])//1000, float(k[1]), float(k[2]),
                  float(k[3]), float(k[4]), float(k[5]))
@@ -211,34 +211,6 @@ async def _kucoin_stream(sym: str):
         await asyncio.sleep(1)
 
 
-# ────────────────────────────── POLONIEX WS ──────────────────────────────
-async def _poloniex_stream(sym: str):
-    """Poloniex USDT-perp trades"""
-    uri = "wss://ws.poloniex.com/ws/public"
-    sub = json.dumps({
-        "event": "subscribe",
-        "channel": "trades",
-        "symbols": [sym]
-    })
-    while True:
-        try:
-            async with websockets.connect(uri, ping_interval=20) as ws:
-                await ws.send(sub)
-                async for msg in ws:
-                    m = json.loads(msg)
-                    if m.get("channel") != "trades":
-                        continue
-                    for d in m.get("data", []):
-                        TICKS.append((
-                            d["t"] // 1000,
-                            float(d["p"]),
-                            float(d["q"]),
-                            "sell" if d["s"] == "SELL" else "buy"
-                        ))
-        except Exception as e:
-            print("[WS] Poloniex reconnect:", e)
-            await asyncio.sleep(5)
-
 # ────────────────────────────── OKX WS ──────────────────────────────────
 async def _okx_stream(sym: str):
     """OKX USDT-margined perpetual trades"""
@@ -275,7 +247,6 @@ _STREAMS = {
     "OKX":      _okx_stream,
     "Bitget":   _bitget_stream,
     "HTX":      _htx_stream,
-    "Huobi":    _htx_stream,
     "KuCoin":   _kucoin_stream,
-    "Poloniex": _poloniex_stream,
 }
+

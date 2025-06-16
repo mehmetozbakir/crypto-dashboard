@@ -193,20 +193,37 @@ analyze_btn = pn.widgets.Button(name="Analiz Yap",
 
 # ─── PRICE UPDATER ────────────────────────────────────────────────
 UTC_OFFSET = 3 * 3600  # +03:00
+
 def _update_prices():
     if not TICKS:
         return
+
     live = TICKS[-1][1]
-    daily = next(
-        (c[4] for c in CANDLES["1m"]
-         if time.gmtime(c[0] + UTC_OFFSET).tm_hour==0 and time.gmtime(c[0] + UTC_OFFSET).tm_min==0),
-        live
-    )
-    price_pane.object = f"**{live:,.2f}**"
-    close_pane.object = f"*Kapanış {daily:,.2f}*"
-    pct   = (live - daily)/daily*100 if daily else 0
-    color = "#29cf82" if pct>=0 else "#ef5350"
-    sign  = "+" if pct>=0 else ""
+
+    # 1) Günlük kapanışı UTC+3 00:00 mumundan al, yoksa live
+    try:
+        daily = next(
+            c[4] for c in CANDLES["1m"]
+            if time.gmtime(c[0] + UTC_OFFSET).tm_hour == 0
+               and time.gmtime(c[0] + UTC_OFFSET).tm_min == 0
+        )
+    except StopIteration:
+        daily = live
+
+    # 2) Dinamik ondalık hassasiyet
+    def fmt(v):
+        if   v >= 1      : return f"{v:,.2f}"
+        elif v >= 0.01   : return f"{v:,.4f}"
+        elif v >= 0.0001 : return f"{v:,.6f}"
+        else              : return f"{v:.8f}"
+
+    price_pane.object = f"**{fmt(live)}**"
+    close_pane.object = f"*Kapanış {fmt(daily)}*"
+
+    # 3) Yüzde değişim
+    pct   = (live - daily) / daily * 100 if daily else 0
+    color = "#29cf82" if pct >= 0 else "#ef5350"
+    sign  = "+" if pct >= 0 else ""
     delta_pane.object = f"<span style='color:{color}'>{sign}{pct:,.2f}%</span>"
 
 pn.state.add_periodic_callback(_update_prices, 200)
