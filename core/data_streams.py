@@ -242,6 +242,9 @@ async def _poloniex_stream(sym: str):
 
 # ────────────── Son olarak, _STREAMS sözlüğünüze ekleyin ────────────────
 _STREAMS.update({
+    "Binance":  _binance_stream,
+    "Bybit":    _bybit_stream,
+    "OKX":      _okx_stream,
     "Bitget":   _bitget_stream,
     "HTX":      _htx_stream,
     "Huobi":    _htx_stream,
