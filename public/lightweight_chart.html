@@ -1,0 +1,43 @@
+<!-- public/lightweight_chart.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <title>Lightweight Chart</title>
+  <!-- production build, defer olmadan yüklüyoruz -->
+  <script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
+  <style>
+    html, body { margin:0; padding:0; height:100%; }
+    #container { width:100%; height:100%; }
+  </style>
+</head>
+<body>
+  <div id="container"></div>
+  <script>
+    const chart = LightweightCharts.createChart(
+      document.getElementById('container'),
+      {
+        layout: { backgroundColor:'#fff', textColor:'#333' },
+        grid:   { vertLines:{color:'#eee'}, horzLines:{color:'#eee'} },
+        rightPriceScale:{borderVisible:false},
+        timeScale:{borderVisible:false, timeVisible:true}
+      }
+    );
+    const series = chart.addCandlestickSeries();
+
+    // WebSocket ile canlı veri
+    const ws = new WebSocket('wss://stream.binance.com:9443/ws/btcusdt@kline_1m');
+    ws.onmessage = ({ data }) => {
+      const { k } = JSON.parse(data);
+      const p = {
+        time:  k.t/1000,
+        open:  +k.o,
+        high:  +k.h,
+        low:   +k.l,
+        close: +k.c
+      };
+      series.update(p);
+    };
+  </script>
+</body>
+</html>

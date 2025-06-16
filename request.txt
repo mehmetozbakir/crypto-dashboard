@@ -1,0 +1,16 @@
+fastapi==0.111.*
+uvicorn[standard]==0.30.*
+panel==1.4.*
+holoviews==1.18.*
+datashader==0.16.*
+redis==5.0.*
+python-binance==1.0.*         # futures REST + websockets
+websockets==12.*              # Bybit WS için
+python-dotenv==1.0.*
+
+
+pip install --user fastapi==0.111.* uvicorn[standard]==0.30.* `
+  panel==1.4.* holoviews==1.18.* datashader==0.16.* `
+  python-binance==1.0.* websockets==12.* python-dotenv==1.* hvplot==0.9.* streamz==0.6.*
+
+python -m pip install --upgrade panel bokeh hvplot holoviews pandas
