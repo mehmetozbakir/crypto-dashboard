@@ -239,6 +239,34 @@ async def _poloniex_stream(sym: str):
             print("[WS] Poloniex reconnect:", e)
             await asyncio.sleep(5)
 
+# ────────────────────────────── OKX WS ──────────────────────────────────
+async def _okx_stream(sym: str):
+    """OKX USDT-margined perpetual trades"""
+    uri = "wss://ws.okx.com:8443/ws/v5/public"
+    sub = json.dumps({
+        "op": "subscribe",
+        "args": [{"channel": "trades", "instType": "UMCBL", "instId": sym}]
+    })
+    while True:
+        try:
+            async with websockets.connect(uri, ping_interval=20) as ws:
+                await ws.send(sub)
+                async for msg in ws:
+                    m = json.loads(msg)
+                    # Sadece trades kanalından gelenleri al
+                    arg = m.get("arg", {})
+                    if arg.get("channel") != "trades":
+                        continue
+                    for d in m.get("data", []):
+                        TICKS.append((
+                            d["ts"] // 1000,
+                            float(d["px"]),
+                            float(d["sz"]),
+                            "sell" if d["side"] == "sell" else "buy"
+                        ))
+        except Exception as e:
+            print("[WS] OKX reconnect:", e)
+            await asyncio.sleep(5)
 
 # ────────────── Son olarak, _STREAMS sözlüğünüze ekleyin ────────────────
 _STREAMS = {
