@@ -128,3 +128,123 @@ def df_candles(tf="1m") -> pd.DataFrame:
         return raw
     raw["time"] = pd.to_datetime(raw["epoch"], unit="s", utc=True)
     return raw.set_index("time")
+# ────────────────────────────── BITGET WS ────────────────────────────────
+async def _bitget_stream(sym: str):
+    """Bitget USDT-perp trades"""
+    uri = "wss://ws.bitget.com/mix/v1/stream"
+    sub = json.dumps({
+        "op": "subscribe",
+        "args": [{"channel": "trade", "instId": sym}]
+    })
+    while True:
+        try:
+            async with websockets.connect(uri, ping_interval=20) as ws:
+                await ws.send(sub)
+                async for msg in ws:
+                    m = json.loads(msg)
+                    if m.get("action") != "push":
+                        continue
+                    for d in m.get("data", []):
+                        TICKS.append((
+                            d["ts"] // 1000,
+                            float(d["price"]),
+                            float(d["size"]),
+                            "sell" if d["side"] == "sell" else "buy"
+                        ))
+        except Exception as e:
+            print("[WS] Bitget reconnect:", e)
+            await asyncio.sleep(5)
+
+
+# ─────────────────────────────── HTX / HUOBI ─────────────────────────────
+async def _htx_stream(sym: str):
+    """HTX (Huobi) linear-swap trades"""
+    uri = "wss://api.huobi.pro/ws"
+    ch = f"market.{sym.lower()}.trade.detail"
+    sub = json.dumps({"sub": ch, "id": "id1"})
+    while True:
+        try:
+            async with websockets.connect(uri, ping_interval=20) as ws:
+                await ws.send(sub)
+                async for raw in ws:
+                    if isinstance(raw, bytes):
+                        raw = zlib.decompress(raw, 31).decode()
+                    msg = json.loads(raw)
+                    if "ping" in msg:
+                        await ws.send(json.dumps({"pong": msg["ping"]}))
+                        continue
+                    if msg.get("ch") != ch:
+                        continue
+                    for td in msg["tick"]["data"]:
+                        TICKS.append((
+                            td["ts"] // 1000,
+                            float(td["price"]),
+                            float(td["amount"]),
+                            "sell" if td["direction"] == "sell" else "buy"
+                        ))
+        except Exception as e:
+            print("[WS] HTX reconnect:", e)
+            await asyncio.sleep(5)
+
+
+# ─────────────────────────────── KUCOIN (poll) ───────────────────────────
+async def _kucoin_stream(sym: str):
+    """KuCoin futures REST-poll every second (skips WS auth handshake)"""
+    url = f"https://api.kucoin.com/api/v1/contracts/{sym}/trades"
+    last_seq = None
+    while True:
+        try:
+            r = requests.get(url, timeout=5)
+            r.raise_for_status()
+            for tr in reversed(r.json()["data"]):
+                seq = tr["sequence"]
+                if last_seq is None or seq > last_seq:
+                    TICKS.append((
+                        int(tr["time"]) // 1000,
+                        float(tr["price"]),
+                        float(tr["size"]),
+                        "sell" if tr["side"] == "sell" else "buy"
+                    ))
+                    last_seq = seq
+        except Exception as e:
+            print("[WS] KuCoin poll err:", e)
+        await asyncio.sleep(1)
+
+
+# ────────────────────────────── POLONIEX WS ──────────────────────────────
+async def _poloniex_stream(sym: str):
+    """Poloniex USDT-perp trades"""
+    uri = "wss://ws.poloniex.com/ws/public"
+    sub = json.dumps({
+        "event": "subscribe",
+        "channel": "trades",
+        "symbols": [sym]
+    })
+    while True:
+        try:
+            async with websockets.connect(uri, ping_interval=20) as ws:
+                await ws.send(sub)
+                async for msg in ws:
+                    m = json.loads(msg)
+                    if m.get("channel") != "trades":
+                        continue
+                    for d in m.get("data", []):
+                        TICKS.append((
+                            d["t"] // 1000,
+                            float(d["p"]),
+                            float(d["q"]),
+                            "sell" if d["s"] == "SELL" else "buy"
+                        ))
+        except Exception as e:
+            print("[WS] Poloniex reconnect:", e)
+            await asyncio.sleep(5)
+
+
+# ────────────── Son olarak, _STREAMS sözlüğünüze ekleyin ────────────────
+_STREAMS.update({
+    "Bitget":   _bitget_stream,
+    "HTX":      _htx_stream,
+    "Huobi":    _htx_stream,
+    "KuCoin":   _kucoin_stream,
+    "Poloniex": _poloniex_stream,
+})
