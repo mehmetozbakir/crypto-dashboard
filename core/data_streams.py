@@ -242,11 +242,11 @@ async def _kucoin_stream(sym: str):
 
 # ────────────────────────────── OKX WS ──────────────────────────────────
 async def _okx_stream(sym: str):
-    """OKX USDT-margined perpetual trades"""
+    """OKX USDT perpetual trade stream"""
     uri = "wss://ws.okx.com:8443/ws/v5/public"
     sub = json.dumps({
         "op": "subscribe",
-        "args": [{"channel": "trades", "instType": "UMCBL", "instId": sym}]
+        "args": [{"channel": "trades", "instId": sym}]
     })
     while True:
         try:
@@ -254,17 +254,17 @@ async def _okx_stream(sym: str):
                 await ws.send(sub)
                 async for msg in ws:
                     m = json.loads(msg)
-                    # Sadece trades kanalından gelenleri al
-                    arg = m.get("arg", {})
-                    if arg.get("channel") != "trades":
+                    # sadece 'trades' kanalı
+                    args = m.get("arg", {})
+                    if args.get("channel") != "trades":
                         continue
                     for d in m.get("data", []):
-                        TICKS.append((
-                            d["ts"] // 1000,
-                            float(d["px"]),
-                            float(d["sz"]),
-                            "sell" if d["side"] == "sell" else "buy"
-                        ))
+                        # timestamp ms cinsinden geldi, string formatında:
+                        ts = int(d["ts"]) // 1000
+                        px = float(d["px"])
+                        sz = float(d["sz"])
+                        side = "sell" if d["side"] == "sell" else "buy"
+                        TICKS.append((ts, px, sz, side))
         except Exception as e:
             print("[WS] OKX reconnect:", e)
             await asyncio.sleep(5)
