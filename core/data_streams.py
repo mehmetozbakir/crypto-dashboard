@@ -37,6 +37,26 @@ def _backfill_higher_tfs():
 
 # ........................ REST geçmiş (1000 × 1 dak.)
 def _fetch_history_1m(exchange, symbol):
+    if exchange == "OKX":
+        url    = "https://www.okx.com/api/v5/market/history-candles"
+        params = {"instId": symbol, "bar": "1m", "limit": 1440}  # son 24 saati çekecek
+        r      = requests.get(url, params=params, timeout=8)
+        r.raise_for_status()
+        data = r.json().get("data", [])
+
+        # CANDLES["1m"] verisini tazeleyelim
+        CANDLES["1m"] = [
+            (
+                int(item[0]) // 1000,    # timestamp (saniye)
+                float(item[1]),         # open
+                float(item[2]),         # high
+                float(item[3]),         # low
+                float(item[4]),         # close
+            )
+            for item in reversed(data)
+        ]
+        return
+
     if exchange == "Binance":
         url = "https://fapi.binance.com/fapi/v1/klines"
         r = requests.get(url, params={"symbol":symbol, "interval":"1m", "limit":1440}, timeout=8)
